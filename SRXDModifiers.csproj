@@ -31,6 +31,10 @@
         <DefineConstants>TRACE</DefineConstants>
         <ErrorReport>prompt</ErrorReport>
         <WarningLevel>4</WarningLevel>
+        <DocumentationFile></DocumentationFile>
+    </PropertyGroup>
+    <PropertyGroup>
+      <PostBuildEvent>copy /Y "C:\Users\domia\Git\SRXDModifiers\bin\Release\SRXDModifiers.dll" "C:\Program Files (x86)\Steam\steamapps\common\Spin Rhythm\BepInEx\plugins"</PostBuildEvent>
     </PropertyGroup>
     <ItemGroup>
         <Reference Include="0Harmony, Version=2.4.2.0, Culture=neutral, PublicKeyToken=null">
@@ -50,6 +54,9 @@
         </Reference>
         <Reference Include="SRXDHelperEvents, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
           <HintPath>Libs\SRXDHelperEvents.dll</HintPath>
+        </Reference>
+        <Reference Include="SRXDScoreMod, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+          <HintPath>Libs\SRXDScoreMod.dll</HintPath>
         </Reference>
         <Reference Include="SSD.Game, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
           <HintPath>Libs\SSD.Game.dll</HintPath>
@@ -84,6 +91,9 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="Modifier.cs" />
+        <Compile Include="Modifiers\NoFail.cs" />
+        <Compile Include="ModifierT.cs" />
         <Compile Include="Plugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>
