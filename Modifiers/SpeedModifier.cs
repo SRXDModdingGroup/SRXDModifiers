@@ -1,8 +1,6 @@
 ﻿namespace SRXDModifiers.Modifiers; 
 
 public abstract class SpeedModifier<T> : Modifier<T> where T : Modifier<T> {
-    public override int Value => 0;
-
     public override bool BlocksSubmission => false;
 
     public override int ExclusivityGroup => 1;

@@ -5,5 +5,7 @@ public class HyperSpeed : SpeedModifier<HyperSpeed> {
 
     public override int Index => 3;
 
+    public override int Value => 5;
+
     protected override float Amount => 1.25f;
 }

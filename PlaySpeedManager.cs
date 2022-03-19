@@ -11,9 +11,9 @@ public static class PlaySpeedManager {
     public static void RemoveSpeedModifier(int index) => playSpeedModifiers.Remove(index);
 
     [HarmonyPostfix]
-    [HarmonyPatch(typeof(Track), nameof(Track.RestartTrack))]
     [HarmonyPatch(typeof(Track), nameof(Track.PlayTrack))]
-    private static void Track_Postfix(Track __instance) {
+    [HarmonyPatch(typeof(Track), nameof(Track.RestartTrack))]
+    private static void Track_PlayTrack_RestartTrack_Postfix(Track __instance) {
         if (__instance.IsInEditMode || __instance.playStateFirst.isInPracticeMode) {
             __instance.ChangePitch(1f);
             
