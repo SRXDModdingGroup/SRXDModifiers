@@ -92,8 +92,15 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="Modifier.cs" />
+        <Compile Include="Modifiers\AutoPlay.cs" />
+        <Compile Include="Modifiers\HyperSpeed.cs" />
         <Compile Include="Modifiers\NoFail.cs" />
+        <Compile Include="Modifiers\SlowMode.cs" />
+        <Compile Include="Modifiers\SpeedModifier.cs" />
+        <Compile Include="Modifiers\SurvivalMode.cs" />
+        <Compile Include="Modifiers\UltraSpeed.cs" />
         <Compile Include="ModifierT.cs" />
+        <Compile Include="PlaySpeedManager.cs" />
         <Compile Include="Plugin.cs" />
         <Compile Include="Properties\AssemblyInfo.cs" />
     </ItemGroup>

@@ -21,7 +21,16 @@ public abstract class Modifier {
     /// </summary>
     public abstract bool BlocksSubmission { get; }
     /// <summary>
+    /// Optional value which prevents multiple modifiers in the same exclusivity group from being enabled at the same time
+    /// </summary>
+    public virtual int ExclusivityGroup => -1;
+    /// <summary>
     /// True if the modifier is currently enabled
     /// </summary>
     public Bindable<bool> Enabled { get; } = new(false);
+    
+    /// <summary>
+    /// Called after all modifiers have been created
+    /// </summary>
+    public virtual void LateInit() { }
 }

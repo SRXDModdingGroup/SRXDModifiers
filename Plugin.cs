@@ -1,14 +1,15 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using BepInEx;
 using HarmonyLib;
-using SMU.Utilities;
 using SpinCore;
 using SpinCore.UI;
 using SRXDModifiers.Modifiers;
 using SRXDScoreMod;
 using UnityEngine;
 using UnityEngine.UI;
+using ScoreModifier = SRXDScoreMod.ScoreModifier;
 
 namespace SRXDModifiers;
 
@@ -18,6 +19,7 @@ namespace SRXDModifiers;
 [BepInPlugin("SRXD.Modifiers", "Modifiers", "1.0.0.0")]
 public class Plugin : SpinPlugin {
     private List<(string, Modifier[])> modifierCategories;
+    private List<Modifier> modifiers;
     private CustomTextMeshProUGUI multiplierText;
     private CustomTextMeshProUGUI submissionDisabledText;
 
@@ -26,18 +28,23 @@ public class Plugin : SpinPlugin {
         
         modifierCategories = new List<(string, Modifier[])> {
             ("Accessibility:", new Modifier[] {
-                new NoFail()
+                new NoFail(),
+                new SlowMode()
             }),
             ("Challenge:", new Modifier[] {
-                
+                new HyperSpeed(),
+                new UltraSpeed(),
+                new SurvivalMode()
             }),
             ("Other:", new Modifier[] {
-                
+                new AutoPlay()
             })
         };
 
         var harmony = new Harmony("Modifiers");
-        var modifiers = new List<Modifier>();
+        
+        harmony.PatchAll(typeof(PlaySpeedManager));
+        modifiers = new List<Modifier>();
 
         foreach (var (_, category) in modifierCategories) {
             foreach (var modifier in category)
@@ -56,7 +63,7 @@ public class Plugin : SpinPlugin {
         ScoreMod.SetModifierSet(new ScoreModifierSet("modifiersOfficial", scoreModifiers));
 
         foreach (var modifier in modifiers)
-            modifier.Enabled.Bind(_ => OnModifierToggled());
+            modifier.Enabled.Bind(value => OnModifierToggled(modifier, value));
     }
 
     protected override void CreateMenus() {
@@ -65,15 +72,41 @@ public class Plugin : SpinPlugin {
         multiplierText = SpinUI.CreateText("Current Multiplier", root);
         submissionDisabledText = SpinUI.CreateText("Score Submission Disabled", root);
 
+        var builder = new StringBuilder();
+
         foreach ((string name, var modifiers) in modifierCategories) {
             new GameObject("Empty").AddComponent<LayoutElement>().transform.SetParent(root, false);
             SpinUI.CreateText(name, root);
 
-            foreach (var modifier in modifiers)
-                SpinUI.CreateToggle(modifier.Name, root).Bind(modifier.Enabled);
+            foreach (var modifier in modifiers) {
+                builder.Clear();
+                builder.Append(modifier.Name);
+
+                int value = modifier.Value;
+
+                if (value != 0) {
+                    if (value > 0)
+                        builder.Append(" (+");
+                    else
+                        builder.Append(" (-");
+
+                    MultiplierToString(builder, Math.Abs(value));
+                    builder.Append(')');
+                }
+
+                if (modifier.BlocksSubmission)
+                    builder.Append(" (Blocks Submission)");
+                
+                SpinUI.CreateToggle(builder.ToString(), root).Bind(modifier.Enabled);
+            }
         }
         
         UpdateMultiplierText();
+    }
+
+    protected override void LateInit() {
+        foreach (var modifier in modifiers)
+            modifier.LateInit();
     }
 
     private void UpdateMultiplierText() {
@@ -84,13 +117,34 @@ public class Plugin : SpinPlugin {
         if (multiplier == 100)
             builder.Append("1x");
         else
-            builder.Append($"{multiplier / 100}.{(multiplier % 100).ToString().TrimEnd('0')}x");
+            MultiplierToString(builder, multiplier);
         
         multiplierText.SetText(builder.ToString());
         submissionDisabledText.enabled = modifierSet.GetAnyBlocksSubmission();
     }
 
-    private void OnModifierToggled() {
+    private void DisableOthersInExclusivityGroup(int group, int indexToKeep) {
+        foreach (var modifier in modifiers) {
+            if (modifier.ExclusivityGroup == group && modifier.Index != indexToKeep)
+                modifier.Enabled.Value = false;
+        }
+    }
+
+    private void OnModifierToggled(Modifier modifier, bool value) {
         UpdateMultiplierText();
+        
+        if (value && modifier.ExclusivityGroup >= 0)
+            DisableOthersInExclusivityGroup(modifier.ExclusivityGroup, modifier.Index);
+    }
+
+    private static void MultiplierToString(StringBuilder builder, int multiplier) {
+        builder.Append(multiplier / 100);
+
+        int remainder = multiplier % 100;
+
+        if (remainder > 0)
+            builder.Append($".{(multiplier % 100).ToString().TrimEnd('0')}");
+
+        builder.Append('x');
     }
 }
