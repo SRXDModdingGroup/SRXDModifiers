@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Text;
 using BepInEx;
 using HarmonyLib;
@@ -18,10 +19,12 @@ namespace SRXDModifiers;
 [BepInDependency("SRXD.ScoreMod", "1.2.0.9")]
 [BepInPlugin("SRXD.Modifiers", "Modifiers", "1.0.0.0")]
 public class Plugin : SpinPlugin {
-    private List<(string, Modifier[])> modifierCategories;
-    private List<Modifier> modifiers;
-    private CustomTextMeshProUGUI multiplierText;
-    private CustomTextMeshProUGUI submissionDisabledText;
+    public static ReadOnlyCollection<Modifier> Modifiers { get; private set; }
+
+    private static List<(string, Modifier[])> modifierCategories;
+    private static List<Modifier> modifiers;
+    private static CustomTextMeshProUGUI multiplierText;
+    private static CustomTextMeshProUGUI submissionDisabledText;
 
     protected override void Awake() {
         base.Awake();
@@ -44,7 +47,9 @@ public class Plugin : SpinPlugin {
         var harmony = new Harmony("Modifiers");
         
         harmony.PatchAll(typeof(PlaySpeedManager));
+        harmony.PatchAll(typeof(CompleteScreenUI));
         modifiers = new List<Modifier>();
+        Modifiers = new ReadOnlyCollection<Modifier>(modifiers);
 
         foreach (var (_, category) in modifierCategories) {
             foreach (var modifier in category)
@@ -109,7 +114,7 @@ public class Plugin : SpinPlugin {
             modifier.LateInit();
     }
 
-    private void UpdateMultiplierText() {
+    private static void UpdateMultiplierText() {
         var modifierSet = ScoreMod.CurrentModifierSet;
         int multiplier = modifierSet.GetOverallMultiplier();
         var builder = new StringBuilder("Current Multiplier: ");
@@ -123,14 +128,14 @@ public class Plugin : SpinPlugin {
         submissionDisabledText.enabled = modifierSet.GetAnyBlocksSubmission();
     }
 
-    private void DisableOthersInExclusivityGroup(int group, int indexToKeep) {
+    private static void DisableOthersInExclusivityGroup(int group, int indexToKeep) {
         foreach (var modifier in modifiers) {
             if (modifier.ExclusivityGroup == group && modifier.Index != indexToKeep)
                 modifier.Enabled.Value = false;
         }
     }
 
-    private void OnModifierToggled(Modifier modifier, bool value) {
+    private static void OnModifierToggled(Modifier modifier, bool value) {
         UpdateMultiplierText();
         
         if (value && modifier.ExclusivityGroup >= 0)

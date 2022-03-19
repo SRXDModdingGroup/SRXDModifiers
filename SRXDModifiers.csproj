@@ -91,6 +91,7 @@
         </Reference>
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="CompleteScreenUI.cs" />
         <Compile Include="Modifier.cs" />
         <Compile Include="Modifiers\AutoPlay.cs" />
         <Compile Include="Modifiers\HyperSpeed.cs" />
