@@ -5,7 +5,7 @@ public class UltraSpeed : SpeedModifier<UltraSpeed> {
 
     public override int Index => 5;
 
-    public override int Value => 5;
+    public override int Value => 10;
 
     protected override float Amount => 1.5f;
 }

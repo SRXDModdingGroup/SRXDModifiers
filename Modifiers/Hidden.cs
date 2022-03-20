@@ -7,14 +7,22 @@ using HarmonyLib;
 using SMU.Extensions;
 using SMU.Utilities;
 using UnityEngine;
+using UnityEngine.Rendering;
+using Utility;
 using MaterialColoring = XD.NoteTypeRenderingProperties.MaterialColoring;
 
 namespace SRXDModifiers.Modifiers; 
 
 public class Hidden : Modifier<Hidden> {
-    private static readonly float BEGIN_FADE_TIME = 0.35f;
-    private static readonly float END_FADE_TIME = 0.25f;
+    private static readonly float BEGIN_FADE_TIME = 0.20f;
+    private static readonly float END_FADE_TIME = 0.15f;
     private static readonly MaterialPropertyBlock modifiedPropertyBlock = new();
+    private static readonly MaterialPropertyBlock blockMeshPropertyBlock;
+
+    static Hidden() {
+        blockMeshPropertyBlock = new MaterialPropertyBlock();
+        blockMeshPropertyBlock.SetVector("_Color", new Vector4(0f, 0f, 0f, 1f));
+    }
     
     public override string Name => "Hidden";
 
@@ -23,6 +31,22 @@ public class Hidden : Modifier<Hidden> {
     public override int Value => 5;
 
     public override bool BlocksSubmission => false;
+
+    private static void RenderBlockingMesh(CommandBuffer buffer, float bottomPixelTime, float timePerTrackTime, float width) {
+        if (!Instance.Enabled.Value)
+            return;
+        
+        buffer.DrawMesh(MeshUtils.cornerQuad, Matrix4x4.TRS(
+            new Vector3(-0.5f * width, bottomPixelTime * timePerTrackTime, 1f),
+            Quaternion.identity,
+            new Vector3(width, timePerTrackTime * END_FADE_TIME, 1f)),
+            Track.Instance.unlitColoredInstanced.materialInstance, 0, 0, blockMeshPropertyBlock);
+        buffer.DrawMesh(MeshUtils.cornerQuadVerticalAlphaGradient, Matrix4x4.TRS(
+            new Vector3(-0.5f * width, (bottomPixelTime + END_FADE_TIME) * timePerTrackTime, 1f),
+            Quaternion.identity,
+            new Vector3(width, timePerTrackTime * (BEGIN_FADE_TIME - END_FADE_TIME), 1f)),
+            Track.Instance.unlitVertexColoredInstanced.materialInstance, 0, 0, blockMeshPropertyBlock);
+    }
 
     private static float GetModifiedRenderThreshold(float oldThreshold) {
         if (Instance.Enabled.Value)
@@ -95,6 +119,33 @@ public class Hidden : Modifier<Hidden> {
         });
         
         operations.Execute(instructionsList);
+
+        return instructionsList;
+    }
+
+    [HarmonyPatch(typeof(TrackRenderer), nameof(TrackRenderer.PrepareTrackTextureForRendering)), HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> TrackRenderer_PrepareTrackTextureForRendering_Transpiler(IEnumerable<CodeInstruction> instructions) {
+        var instructionsList = new List<CodeInstruction>(instructions);
+        var Hidden_RenderBlockingMesh = typeof(Hidden).GetMethod(nameof(RenderBlockingMesh), BindingFlags.NonPublic | BindingFlags.Static);
+        var RenderSetupAndState_trackCanvasesAndCamera = typeof(TrackRenderer.RenderSetupAndState).GetField(nameof(TrackRenderer.RenderSetupAndState.trackCanvasesAndCamera));
+
+        var match = PatternMatching.Match(instructionsList, new Func<CodeInstruction, bool>[] {
+            instr => instr.opcode == OpCodes.Ldarg_0, // render
+            instr => instr.LoadsField(RenderSetupAndState_trackCanvasesAndCamera)
+        }).First()[0];
+
+        var labels = new List<Label>(instructionsList[match.Start].labels);
+        
+        instructionsList[match.Start].labels.Clear();
+        instructionsList.InsertRange(match.Start, new CodeInstruction[] {
+            new CodeInstruction(OpCodes.Ldarg_1).WithLabels(labels), // buffer
+            new (OpCodes.Ldloc, 16), // bottomPixelTime
+            new (OpCodes.Ldloc, 15), // timePerTrackTime
+            new (OpCodes.Ldloc, 19), // width
+            new (OpCodes.Call, Hidden_RenderBlockingMesh)
+        });
+        
+        Plugin.Logger.LogMessage(labels.Count);
 
         return instructionsList;
     }
