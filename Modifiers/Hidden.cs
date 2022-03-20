@@ -14,8 +14,8 @@ using MaterialColoring = XD.NoteTypeRenderingProperties.MaterialColoring;
 namespace SRXDModifiers.Modifiers; 
 
 public class Hidden : Modifier<Hidden> {
-    private static readonly float BEGIN_FADE_TIME = 0.20f;
-    private static readonly float END_FADE_TIME = 0.15f;
+    private static readonly float BEGIN_FADE_TIME = 0.25f;
+    private static readonly float END_FADE_TIME = 0.2f;
     private static readonly MaterialPropertyBlock modifiedPropertyBlock = new();
     private static readonly MaterialPropertyBlock blockMeshPropertyBlock;
 
