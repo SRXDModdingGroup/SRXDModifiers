@@ -1,14 +1,33 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using HarmonyLib;
 
 namespace SRXDModifiers; 
 
 public static class PlaySpeedManager {
     private static SortedDictionary<int, float> playSpeedModifiers = new();
+    private static float speedMutliplier = 1f;
 
-    public static void AddSpeedModifier(int index, float amount) => playSpeedModifiers[index] = amount;
+    public static event Action<float> OnSpeedMultiplierChanged;
 
-    public static void RemoveSpeedModifier(int index) => playSpeedModifiers.Remove(index);
+    public static void AddSpeedModifier(int index, float amount) {
+        playSpeedModifiers[index] = amount;
+        UpdateMultiplier();
+    }
+
+    public static void RemoveSpeedModifier(int index) {
+        playSpeedModifiers.Remove(index);
+        UpdateMultiplier();
+    }
+
+    private static void UpdateMultiplier() {
+        speedMutliplier = 1f;
+        
+        foreach (var pair in playSpeedModifiers)
+            speedMutliplier *= pair.Value;
+        
+        OnSpeedMultiplierChanged?.Invoke(speedMutliplier);
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Track), nameof(Track.PlayTrack))]
@@ -20,12 +39,7 @@ public static class PlaySpeedManager {
             return;
         }
         
-        float total = 1f;
-
-        foreach (var pair in playSpeedModifiers)
-            total *= pair.Value;
-        
-        __instance.ChangePitch(total);
+        __instance.ChangePitch(speedMutliplier);
     }
 
     [HarmonyPatch(typeof(XDLevelSelectMenuBase), nameof(XDLevelSelectMenuBase.OpenMenu)), HarmonyPostfix]
@@ -33,6 +47,16 @@ public static class PlaySpeedManager {
         var track = Track.Instance;
 
         if (track != null) 
-            track.ChangePitch(1f);
+            track.ChangePitch(speedMutliplier);
+    }
+
+    [HarmonyPatch(typeof(GameplayVariables), nameof(GameplayVariables.GetTrackSpeedForDifficulty)), HarmonyPostfix]
+    private static void GameplayVariables_GetTrackSpeedForDifficulty_Postfix(ref float __result) {
+        var track = Track.Instance;
+        
+        if (track == null || track.IsInEditMode || track.playStateFirst.isInPracticeMode)
+            return;
+
+        __result /= speedMutliplier;
     }
 }

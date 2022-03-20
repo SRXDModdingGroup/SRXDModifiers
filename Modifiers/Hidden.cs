@@ -28,29 +28,42 @@ public class Hidden : Modifier<Hidden> {
 
     public override int Index => 6;
 
-    public override int Value => 5;
+    public override int Value => 1;
 
     public override bool BlocksSubmission => false;
+
+    private static float scaledBeginFadeTime = BEGIN_FADE_TIME;
+
+    private static float scaledEndFadeTime = END_FADE_TIME;
+
+    public Hidden() {
+        PlaySpeedManager.OnSpeedMultiplierChanged += speed => {
+            scaledBeginFadeTime = speed * BEGIN_FADE_TIME;
+            scaledEndFadeTime = speed * END_FADE_TIME;
+        };
+    }
 
     private static void RenderBlockingMesh(CommandBuffer buffer, float bottomPixelTime, float timePerTrackTime, float width) {
         if (!Instance.Enabled.Value)
             return;
+
+        float pitch = (float) Track.Instance.basePitch;
         
         buffer.DrawMesh(MeshUtils.cornerQuad, Matrix4x4.TRS(
             new Vector3(-0.5f * width, bottomPixelTime * timePerTrackTime, 1f),
             Quaternion.identity,
-            new Vector3(width, timePerTrackTime * END_FADE_TIME, 1f)),
+            new Vector3(width, timePerTrackTime * scaledEndFadeTime, 1f)),
             Track.Instance.unlitColoredInstanced.materialInstance, 0, 0, blockMeshPropertyBlock);
         buffer.DrawMesh(MeshUtils.cornerQuadVerticalAlphaGradient, Matrix4x4.TRS(
-            new Vector3(-0.5f * width, (bottomPixelTime + END_FADE_TIME) * timePerTrackTime, 1f),
+            new Vector3(-0.5f * width, timePerTrackTime * (bottomPixelTime + scaledEndFadeTime), 1f),
             Quaternion.identity,
-            new Vector3(width, timePerTrackTime * (BEGIN_FADE_TIME - END_FADE_TIME), 1f)),
+            new Vector3(width, timePerTrackTime * (scaledBeginFadeTime - scaledEndFadeTime) * pitch, 1f)),
             Track.Instance.unlitVertexColoredInstanced.materialInstance, 0, 0, blockMeshPropertyBlock);
     }
 
     private static float GetModifiedRenderThreshold(float oldThreshold) {
         if (Instance.Enabled.Value)
-            return oldThreshold + END_FADE_TIME;
+            return oldThreshold + scaledEndFadeTime;
 
         return oldThreshold;
     }
@@ -61,12 +74,12 @@ public class Hidden : Modifier<Hidden> {
         
         float alpha;
 
-        if (relativeTime > BEGIN_FADE_TIME)
+        if (relativeTime > scaledBeginFadeTime)
             alpha = 1f;
-        else if (relativeTime < END_FADE_TIME)
+        else if (relativeTime < scaledEndFadeTime)
             alpha = 0f;
         else
-            alpha = Mathf.InverseLerp(END_FADE_TIME, BEGIN_FADE_TIME, relativeTime);
+            alpha = Mathf.InverseLerp(scaledEndFadeTime, scaledBeginFadeTime, relativeTime);
         
         int id = coloring.ColorPropertyNameId;
         
@@ -144,8 +157,6 @@ public class Hidden : Modifier<Hidden> {
             new (OpCodes.Ldloc, 19), // width
             new (OpCodes.Call, Hidden_RenderBlockingMesh)
         });
-        
-        Plugin.Logger.LogMessage(labels.Count);
 
         return instructionsList;
     }
