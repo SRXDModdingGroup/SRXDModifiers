@@ -1,6 +1,5 @@
 ﻿using System.Text;
 using HarmonyLib;
-using SRXDModifiers.Modifiers;
 using TMPro;
 using UnityEngine;
 

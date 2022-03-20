@@ -94,6 +94,7 @@
         <Compile Include="CompleteScreenUI.cs" />
         <Compile Include="Modifier.cs" />
         <Compile Include="Modifiers\AutoPlay.cs" />
+        <Compile Include="Modifiers\Hidden.cs" />
         <Compile Include="Modifiers\HyperSpeed.cs" />
         <Compile Include="Modifiers\NoFail.cs" />
         <Compile Include="Modifiers\SlowMode.cs" />

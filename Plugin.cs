@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
 using BepInEx;
+using BepInEx.Logging;
 using HarmonyLib;
 using SpinCore;
 using SpinCore.UI;
@@ -19,6 +20,8 @@ namespace SRXDModifiers;
 [BepInDependency("SRXD.ScoreMod", "1.2.0.9")]
 [BepInPlugin("SRXD.Modifiers", "Modifiers", "1.0.0.0")]
 public class Plugin : SpinPlugin {
+    public new static ManualLogSource Logger { get; private set; }
+    
     public static ReadOnlyCollection<Modifier> Modifiers { get; private set; }
 
     private static List<(string, Modifier[])> modifierCategories;
@@ -28,7 +31,8 @@ public class Plugin : SpinPlugin {
 
     protected override void Awake() {
         base.Awake();
-        
+
+        Logger = base.Logger;
         modifierCategories = new List<(string, Modifier[])> {
             ("Accessibility:", new Modifier[] {
                 new NoFail(),
@@ -37,6 +41,7 @@ public class Plugin : SpinPlugin {
             ("Challenge:", new Modifier[] {
                 new HyperSpeed(),
                 new UltraSpeed(),
+                new Hidden(),
                 new SurvivalMode()
             }),
             ("Other:", new Modifier[] {
@@ -143,12 +148,14 @@ public class Plugin : SpinPlugin {
     }
 
     private static void MultiplierToString(StringBuilder builder, int multiplier) {
-        builder.Append(multiplier / 100);
+        string multString = multiplier.ToString();
 
-        int remainder = multiplier % 100;
-
-        if (remainder > 0)
-            builder.Append($".{(multiplier % 100).ToString().TrimEnd('0')}");
+        if (multiplier % 100 > 0) {
+            multString = multString.PadLeft(3, '0');
+            builder.Append(multString.Insert(multString.Length - 2, ".").TrimEnd('0'));
+        }
+        else
+            builder.Append(multiplier / 100);
 
         builder.Append('x');
     }

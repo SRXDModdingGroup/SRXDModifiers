@@ -1,6 +1,4 @@
-﻿using SMU.Utilities;
-
-namespace SRXDModifiers; 
+﻿namespace SRXDModifiers; 
 
 public abstract class Modifier<T> : Modifier where T : Modifier<T> {
     /// <summary>
