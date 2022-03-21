@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using Utility;
 using MaterialColoring = XD.NoteTypeRenderingProperties.MaterialColoring;
+using Object = UnityEngine.Object;
 
 namespace SRXDModifiers.Modifiers; 
 
@@ -33,32 +34,15 @@ public class Hidden : Modifier<Hidden> {
     public override bool BlocksSubmission => false;
 
     private static float scaledBeginFadeTime = BEGIN_FADE_TIME;
-
     private static float scaledEndFadeTime = END_FADE_TIME;
+    private static RectTransform blockerTransform;
+    private static RectTransform blockerGradientTransform;
 
     public Hidden() {
         PlaySpeedManager.OnSpeedMultiplierChanged += speed => {
             scaledBeginFadeTime = speed * BEGIN_FADE_TIME;
             scaledEndFadeTime = speed * END_FADE_TIME;
         };
-    }
-
-    private static void RenderBlockingMesh(CommandBuffer buffer, float bottomPixelTime, float timePerTrackTime, float width) {
-        if (!Instance.Enabled.Value)
-            return;
-
-        float pitch = (float) Track.Instance.basePitch;
-        
-        buffer.DrawMesh(MeshUtils.cornerQuad, Matrix4x4.TRS(
-            new Vector3(-0.5f * width, bottomPixelTime * timePerTrackTime, 1f),
-            Quaternion.identity,
-            new Vector3(width, timePerTrackTime * scaledEndFadeTime, 1f)),
-            Track.Instance.unlitColoredInstanced.materialInstance, 0, 0, blockMeshPropertyBlock);
-        buffer.DrawMesh(MeshUtils.cornerQuadVerticalAlphaGradient, Matrix4x4.TRS(
-            new Vector3(-0.5f * width, timePerTrackTime * (bottomPixelTime + scaledEndFadeTime), 1f),
-            Quaternion.identity,
-            new Vector3(width, timePerTrackTime * (scaledBeginFadeTime - scaledEndFadeTime) * pitch, 1f)),
-            Track.Instance.unlitVertexColoredInstanced.materialInstance, 0, 0, blockMeshPropertyBlock);
     }
 
     private static float GetModifiedRenderThreshold(float oldThreshold) {
@@ -101,6 +85,70 @@ public class Hidden : Modifier<Hidden> {
         return modifiedPropertyBlock;
     }
 
+    [HarmonyPatch(typeof(TrackCanvasesAndCamera), nameof(TrackCanvasesAndCamera.Awake)), HarmonyPostfix]
+    private static void TrackCanvasesAndCamera_Awake_Postfix(TrackCanvasesAndCamera __instance) {
+        var canvas = __instance.worldTrackCanvas.parent.GetComponent<RectTransform>();
+        var blocker = Object.Instantiate(canvas.Find("Panel"), canvas).gameObject;
+
+        blocker.name = "Blocker";
+        blockerTransform = blocker.GetComponent<RectTransform>();
+        
+        var blockerRenderer = blockerTransform.Find("PanelSprite").GetComponent<SpriteRenderer>();
+        
+        blockerRenderer.sortingOrder = 1;
+        blockerRenderer.color = Color.black;
+
+        for (int i = 0; i < canvas.childCount; i++) {
+            var child = canvas.GetChild(i);
+            
+            if (child.name != "Panel")
+                continue;
+
+            foreach (var renderer in child.GetComponentsInChildren<SpriteRenderer>())
+                renderer.sortingOrder = 2;
+        }
+        
+        var gradient = new Texture2D(36, 36, TextureFormat.ARGB32, false);
+
+        for (int i = 0; i < 36; i++) {
+            var color = new Color(1f, 1f, 1f, Mathf.InverseLerp(33f, 3f, i));
+            
+            for (int j = 0; j < 36; j++)
+                gradient.SetPixel(j, i, color);
+        }
+        
+        gradient.Apply();
+
+        var blockerGradient = Object.Instantiate(blocker, canvas).gameObject;
+
+        blockerGradient.name = "BlockerGradient";
+        blockerGradientTransform = blockerGradient.GetComponent<RectTransform>();
+        blockerGradientTransform.Find("PanelSprite").GetComponent<SpriteRenderer>().sprite =
+            Sprite.Create(gradient, new Rect(2f, 2f, 32f, 32f), new Vector2(0.5f, 0.5f), 100);
+    }
+
+    [HarmonyPatch(typeof(TrackRenderer.RenderSetupAndState), nameof(TrackRenderer.RenderSetupAndState.UpdateFrameSettings)), HarmonyPostfix]
+    private static void RenderSetupAndState_UpdateFrameSettings_Postfix(TrackRenderer.RenderSetupAndState __instance) {
+        if (blockerTransform == null)
+            return;
+        
+        if (!Instance.Enabled.Value) {
+            blockerTransform.gameObject.SetActive(false);
+            blockerGradientTransform.gameObject.SetActive(false);
+
+            return;
+        }
+        
+        blockerTransform.gameObject.SetActive(true);
+        blockerGradientTransform.gameObject.SetActive(true);
+        blockerTransform.anchorMax = new Vector2(1f, scaledEndFadeTime / __instance.frameSettings.leadInTime);
+        blockerGradientTransform.anchorMin = new Vector2(0f, blockerTransform.anchorMax.y);
+        blockerGradientTransform.anchorMax = new Vector2(1f, scaledBeginFadeTime / __instance.frameSettings.leadInTime);
+    }
+
+    [HarmonyPatch(typeof(TrackGameplayLogic), nameof(TrackGameplayLogic.CreateFreeStyleSectionSideParticles)), HarmonyPrefix]
+    private static bool TrackGameplayLogic_CreateFreeStyleSectionSideParticles_Prefix() => !Instance.Enabled.Value;
+
     [HarmonyPatch(typeof(TrackRenderer), "DrawNoteMeshes"), HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> TrackRenderer_DrawNoteMeshes_Transpiler(IEnumerable<CodeInstruction> instructions) {
         var instructionsList = new List<CodeInstruction>(instructions);
@@ -132,31 +180,6 @@ public class Hidden : Modifier<Hidden> {
         });
         
         operations.Execute(instructionsList);
-
-        return instructionsList;
-    }
-
-    [HarmonyPatch(typeof(TrackRenderer), nameof(TrackRenderer.PrepareTrackTextureForRendering)), HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> TrackRenderer_PrepareTrackTextureForRendering_Transpiler(IEnumerable<CodeInstruction> instructions) {
-        var instructionsList = new List<CodeInstruction>(instructions);
-        var Hidden_RenderBlockingMesh = typeof(Hidden).GetMethod(nameof(RenderBlockingMesh), BindingFlags.NonPublic | BindingFlags.Static);
-        var RenderSetupAndState_trackCanvasesAndCamera = typeof(TrackRenderer.RenderSetupAndState).GetField(nameof(TrackRenderer.RenderSetupAndState.trackCanvasesAndCamera));
-
-        var match = PatternMatching.Match(instructionsList, new Func<CodeInstruction, bool>[] {
-            instr => instr.opcode == OpCodes.Ldarg_0, // render
-            instr => instr.LoadsField(RenderSetupAndState_trackCanvasesAndCamera)
-        }).First()[0];
-
-        var labels = new List<Label>(instructionsList[match.Start].labels);
-        
-        instructionsList[match.Start].labels.Clear();
-        instructionsList.InsertRange(match.Start, new CodeInstruction[] {
-            new CodeInstruction(OpCodes.Ldarg_1).WithLabels(labels), // buffer
-            new (OpCodes.Ldloc, 16), // bottomPixelTime
-            new (OpCodes.Ldloc, 15), // timePerTrackTime
-            new (OpCodes.Ldloc, 19), // width
-            new (OpCodes.Call, Hidden_RenderBlockingMesh)
-        });
 
         return instructionsList;
     }
