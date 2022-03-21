@@ -7,23 +7,15 @@ using HarmonyLib;
 using SMU.Extensions;
 using SMU.Utilities;
 using UnityEngine;
-using UnityEngine.Rendering;
-using Utility;
 using MaterialColoring = XD.NoteTypeRenderingProperties.MaterialColoring;
 using Object = UnityEngine.Object;
 
 namespace SRXDModifiers.Modifiers; 
 
 public class Hidden : Modifier<Hidden> {
-    private static readonly float BEGIN_FADE_TIME = 0.25f;
+    private static readonly float BEGIN_FADE_TIME = 0.3f;
     private static readonly float END_FADE_TIME = 0.2f;
     private static readonly MaterialPropertyBlock modifiedPropertyBlock = new();
-    private static readonly MaterialPropertyBlock blockMeshPropertyBlock;
-
-    static Hidden() {
-        blockMeshPropertyBlock = new MaterialPropertyBlock();
-        blockMeshPropertyBlock.SetVector("_Color", new Vector4(0f, 0f, 0f, 1f));
-    }
     
     public override string Name => "Hidden";
 
@@ -49,24 +41,17 @@ public class Hidden : Modifier<Hidden> {
         if (Instance.Enabled.Value)
             return oldThreshold + scaledEndFadeTime;
 
-        return oldThreshold;
+        return oldThreshold - 0.01f;
     }
 
     private static MaterialPropertyBlock GetModifiedPropertyBlock(MaterialPropertyBlock propertyBlock, MaterialColoring coloring, float relativeTime) {
-        if (!Instance.Enabled.Value || propertyBlock == null)
+        if (!Instance.Enabled.Value || relativeTime > scaledBeginFadeTime || propertyBlock == null)
             return propertyBlock;
         
-        float alpha;
-
-        if (relativeTime > scaledBeginFadeTime)
-            alpha = 1f;
-        else if (relativeTime < scaledEndFadeTime)
-            alpha = 0f;
-        else
-            alpha = Mathf.InverseLerp(scaledEndFadeTime, scaledBeginFadeTime, relativeTime);
-        
+        float alpha = Mathf.InverseLerp(scaledBeginFadeTime, scaledEndFadeTime, relativeTime);
         int id = coloring.ColorPropertyNameId;
         
+        alpha = 1f - alpha * alpha;
         modifiedPropertyBlock.Clear();
 
         if (coloring.colorFormatType == MaterialColoring.ColorFormatType.RGBA) {
@@ -111,7 +96,8 @@ public class Hidden : Modifier<Hidden> {
         var gradient = new Texture2D(36, 36, TextureFormat.ARGB32, false);
 
         for (int i = 0; i < 36; i++) {
-            var color = new Color(1f, 1f, 1f, Mathf.InverseLerp(33f, 3f, i));
+            float interp = Mathf.InverseLerp(33f, 2f, i);
+            var color = new Color(1f, 1f, 1f, interp * interp);
             
             for (int j = 0; j < 36; j++)
                 gradient.SetPixel(j, i, color);
@@ -159,10 +145,12 @@ public class Hidden : Modifier<Hidden> {
         var Hidden_GetModifiedRenderThreshold = typeof(Hidden).GetMethod(nameof(GetModifiedRenderThreshold), BindingFlags.NonPublic | BindingFlags.Static);
 
         var match = PatternMatching.Match(instructionsList, new Func<CodeInstruction, bool>[] {
+            instr => instr.LoadsConstant(),
+            instr => instr.opcode == OpCodes.Sub,
             instr => instr.Calls(PlayableTrackData_GetLastNoteIndexBeforeTime)
         }).First()[0];
         
-        operations.Insert(match.Start, new CodeInstruction[] {
+        operations.Replace(match.Start, 2, new CodeInstruction[] {
             new (OpCodes.Call, Hidden_GetModifiedRenderThreshold)
         });
 
