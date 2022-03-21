@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Text;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Logging;
 using HarmonyLib;
 using SpinCore;
 using SpinCore.UI;
+using SpinCore.Utility;
 using SRXDModifiers.Modifiers;
 using SRXDScoreMod;
 using UnityEngine;
@@ -17,9 +19,10 @@ namespace SRXDModifiers;
 
 [BepInDependency("com.pink.spinrhythm.moddingutils", "1.0.2")]
 [BepInDependency("com.pink.spinrhythm.spincore")]
-[BepInDependency("SRXD.ScoreMod", "1.2.0.9")]
+[BepInDependency("SRXD.ScoreMod", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInPlugin("SRXD.Modifiers", "Modifiers", "1.0.0.0")]
 public class Plugin : SpinPlugin {
+    public static Plugin Instance { get; private set; }
     public new static ManualLogSource Logger { get; private set; }
     
     public static ReadOnlyCollection<Modifier> Modifiers { get; private set; }
@@ -28,11 +31,21 @@ public class Plugin : SpinPlugin {
     private static List<Modifier> modifiers;
     private static CustomTextMeshProUGUI multiplierText;
     private static CustomTextMeshProUGUI submissionDisabledText;
+    private static bool anyModifiersEnabled;
+    private static bool scoreModLoaded;
 
     protected override void Awake() {
         base.Awake();
 
+        Instance = this;
         Logger = base.Logger;
+        scoreModLoaded = Chainloader.PluginInfos.TryGetValue("SRXD.ScoreMod", out var info) && info.Metadata.Version >= Version.Parse("1.2.0.9");
+        
+        if (scoreModLoaded)
+            Logger.LogMessage("Found ScoreMod");
+        else
+            Logger.LogMessage("ScoreMod not found");
+        
         modifierCategories = new List<(string, Modifier[])> {
             ("Accessibility:", new Modifier[] {
                 new NoFail(),
@@ -57,20 +70,14 @@ public class Plugin : SpinPlugin {
         Modifiers = new ReadOnlyCollection<Modifier>(modifiers);
 
         foreach (var (_, category) in modifierCategories) {
-            foreach (var modifier in category)
+            foreach (var modifier in category) {
                 modifiers.Add(modifier);
+                harmony.PatchAll(modifier.GetType());
+            }
         }
 
-        var scoreModifiers = new ScoreModifier[modifiers.Count];
-
-        for (int i = 0; i < modifiers.Count; i++) {
-            var modifier = modifiers[i];
-
-            scoreModifiers[i] = new ScoreModifier(modifier.Index, modifier.Value, modifier.BlocksSubmission, modifier.Enabled);
-            harmony.PatchAll(modifier.GetType());
-        }
-        
-        ScoreMod.SetModifierSet(new ScoreModifierSet("modifiersOfficial", scoreModifiers));
+        if (scoreModLoaded)
+            ScoreModWrapper.CreateScoreModifierSet(modifiers);
 
         foreach (var modifier in modifiers)
             modifier.Enabled.Bind(value => OnModifierToggled(modifier, value));
@@ -94,7 +101,7 @@ public class Plugin : SpinPlugin {
 
                 int value = modifier.Value;
 
-                if (value != 0) {
+                if (scoreModLoaded && value != 0) {
                     if (value > 0)
                         builder.Append(" (+");
                     else
@@ -104,7 +111,7 @@ public class Plugin : SpinPlugin {
                     builder.Append(')');
                 }
 
-                if (modifier.BlocksSubmission)
+                if (!scoreModLoaded || modifier.BlocksSubmission)
                     builder.Append(" (Blocks Submission)");
                 
                 SpinUI.CreateToggle(builder.ToString(), root).Bind(modifier.Enabled);
@@ -120,8 +127,14 @@ public class Plugin : SpinPlugin {
     }
 
     private static void UpdateMultiplierText() {
-        var modifierSet = ScoreMod.CurrentModifierSet;
-        int multiplier = modifierSet.GetOverallMultiplier();
+        if (!scoreModLoaded) {
+            multiplierText.SetText("ScoreMod not found. Install ScoreMod to enable score multipliers");
+            submissionDisabledText.enabled = anyModifiersEnabled;
+            
+            return;
+        }
+        
+        int multiplier = ScoreModWrapper.GetOverallMultiplier();
         var builder = new StringBuilder("Current Multiplier: ");
 
         if (multiplier == 100)
@@ -130,7 +143,7 @@ public class Plugin : SpinPlugin {
             MultiplierToString(builder, multiplier);
         
         multiplierText.SetText(builder.ToString());
-        submissionDisabledText.enabled = modifierSet.GetAnyBlocksSubmission();
+        submissionDisabledText.enabled = ScoreModWrapper.GetAnyBlocksSubmission();
     }
 
     private static void DisableOthersInExclusivityGroup(int group, int indexToKeep) {
@@ -141,10 +154,26 @@ public class Plugin : SpinPlugin {
     }
 
     private static void OnModifierToggled(Modifier modifier, bool value) {
-        UpdateMultiplierText();
-        
         if (value && modifier.ExclusivityGroup >= 0)
             DisableOthersInExclusivityGroup(modifier.ExclusivityGroup, modifier.Index);
+
+        anyModifiersEnabled = false;
+
+        foreach (var modifier1 in modifiers) {
+            if (!modifier1.Enabled.Value)
+                continue;
+
+            anyModifiersEnabled = true;
+
+            break;
+        }
+        
+        if (anyModifiersEnabled)
+            ScoreSubmissionUtility.DisableScoreSubmission(Instance);
+        else
+            ScoreSubmissionUtility.EnableScoreSubmission(Instance);
+        
+        UpdateMultiplierText();
     }
 
     private static void MultiplierToString(StringBuilder builder, int multiplier) {

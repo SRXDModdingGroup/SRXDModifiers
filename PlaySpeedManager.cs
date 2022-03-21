@@ -5,10 +5,22 @@ using HarmonyLib;
 namespace SRXDModifiers; 
 
 public static class PlaySpeedManager {
-    private static SortedDictionary<int, float> playSpeedModifiers = new();
-    private static float speedMutliplier = 1f;
+    private static float baseSpeedMutliplier = 1f;
+
+    public static float SpeedMultiplier {
+        get {
+            var track = Track.Instance;
+
+            if (track == null || track.IsInEditMode || track.playStateFirst.isInPracticeMode)
+                return 1f;
+
+            return baseSpeedMutliplier;
+        }
+    }
 
     public static event Action<float> OnSpeedMultiplierChanged;
+    
+    private static SortedDictionary<int, float> playSpeedModifiers = new();
 
     public static void AddSpeedModifier(int index, float amount) {
         playSpeedModifiers[index] = amount;
@@ -21,34 +33,27 @@ public static class PlaySpeedManager {
     }
 
     private static void UpdateMultiplier() {
-        speedMutliplier = 1f;
+        baseSpeedMutliplier = 1f;
         
         foreach (var pair in playSpeedModifiers)
-            speedMutliplier *= pair.Value;
+            baseSpeedMutliplier *= pair.Value;
+
+        float speedMultiplier = SpeedMultiplier;
+        var track = Track.Instance;
         
-        OnSpeedMultiplierChanged?.Invoke(speedMutliplier);
+        if (track != null)
+            track.ChangePitch(speedMultiplier);
+        
+        OnSpeedMultiplierChanged?.Invoke(speedMultiplier);
     }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Track), nameof(Track.PlayTrack))]
     [HarmonyPatch(typeof(Track), nameof(Track.RestartTrack))]
-    private static void Track_PlayTrack_RestartTrack_Postfix(Track __instance) {
-        if (__instance.IsInEditMode || __instance.playStateFirst.isInPracticeMode) {
-            __instance.ChangePitch(1f);
-            
-            return;
-        }
-        
-        __instance.ChangePitch(speedMutliplier);
-    }
+    private static void Track_PlayTrack_RestartTrack_Postfix(Track __instance) => UpdateMultiplier();
 
     [HarmonyPatch(typeof(XDLevelSelectMenuBase), nameof(XDLevelSelectMenuBase.OpenMenu)), HarmonyPostfix]
-    private static void XDLevelSelectMenuBase_OpenMenu_Postfix() {
-        var track = Track.Instance;
-
-        if (track != null) 
-            track.ChangePitch(speedMutliplier);
-    }
+    private static void XDLevelSelectMenuBase_OpenMenu_Postfix() => UpdateMultiplier();
 
     [HarmonyPatch(typeof(GameplayVariables), nameof(GameplayVariables.GetTrackSpeedForDifficulty)), HarmonyPostfix]
     private static void GameplayVariables_GetTrackSpeedForDifficulty_Postfix(ref float __result) {
@@ -57,6 +62,7 @@ public static class PlaySpeedManager {
         if (track == null || track.IsInEditMode || track.playStateFirst.isInPracticeMode)
             return;
 
-        __result /= speedMutliplier;
+        UpdateMultiplier();
+        __result /= baseSpeedMutliplier;
     }
 }
