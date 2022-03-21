@@ -20,15 +20,15 @@ public static class PlaySpeedManager {
 
     public static event Action<float> OnSpeedMultiplierChanged;
     
-    private static SortedDictionary<int, float> playSpeedModifiers = new();
+    private static SortedDictionary<string, float> playSpeedModifiers = new();
 
-    public static void AddSpeedModifier(int index, float amount) {
-        playSpeedModifiers[index] = amount;
+    public static void AddSpeedModifier(string key, float amount) {
+        playSpeedModifiers[key] = amount;
         UpdateMultiplier();
     }
 
-    public static void RemoveSpeedModifier(int index) {
-        playSpeedModifiers.Remove(index);
+    public static void RemoveSpeedModifier(string key) {
+        playSpeedModifiers.Remove(key);
         UpdateMultiplier();
     }
 

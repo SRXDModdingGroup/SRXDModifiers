@@ -5,8 +5,6 @@ namespace SRXDModifiers.Modifiers;
 public class AutoPlay : Modifier<AutoPlay> {
     public override string Name => "Auto Play";
 
-    public override int Index => 1;
-
     public override int Value => 0;
 
     public override bool BlocksSubmission => true;

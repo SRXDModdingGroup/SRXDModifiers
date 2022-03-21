@@ -19,8 +19,6 @@ public class Hidden : Modifier<Hidden> {
     
     public override string Name => "Hidden";
 
-    public override int Index => 6;
-
     public override int Value => 1;
 
     public override bool BlocksSubmission => false;

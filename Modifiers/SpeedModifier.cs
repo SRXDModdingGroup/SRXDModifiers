@@ -10,9 +10,9 @@ public abstract class SpeedModifier<T> : Modifier<T> where T : Modifier<T> {
     protected SpeedModifier() {
         Enabled.Bind(value => {
             if (value)
-                PlaySpeedManager.AddSpeedModifier(Index, Amount);
+                PlaySpeedManager.AddSpeedModifier(Name, Amount);
             else
-                PlaySpeedManager.RemoveSpeedModifier(Index);
+                PlaySpeedManager.RemoveSpeedModifier(Name);
         });
     }
 }

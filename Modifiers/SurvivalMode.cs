@@ -5,8 +5,6 @@ namespace SRXDModifiers.Modifiers;
 public class SurvivalMode : Modifier<SurvivalMode> {
     public override string Name => "Survival Mode";
 
-    public override int Index => 2;
-
     public override int Value => 0;
 
     public override bool BlocksSubmission => false;

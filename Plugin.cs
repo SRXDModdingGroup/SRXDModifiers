@@ -27,8 +27,8 @@ public class Plugin : SpinPlugin {
     
     public static ReadOnlyCollection<Modifier> Modifiers { get; private set; }
 
+    private static Modifier[] modifiers;
     private static List<(string, Modifier[])> modifierCategories;
-    private static List<Modifier> modifiers;
     private static CustomTextMeshProUGUI multiplierText;
     private static CustomTextMeshProUGUI submissionDisabledText;
     private static bool anyModifiersEnabled;
@@ -45,20 +45,30 @@ public class Plugin : SpinPlugin {
             Logger.LogMessage("Found ScoreMod");
         else
             Logger.LogMessage("ScoreMod not found");
-        
+
+        // DO NOT REORDER THIS ARRAY
+        modifiers = new Modifier[] {
+            new SlowMode(),
+            new HyperSpeed(),
+            new UltraSpeed(),
+            new Hidden(),
+            new SurvivalMode(),
+            new NoFail(),
+            new AutoPlay()
+        };
         modifierCategories = new List<(string, Modifier[])> {
             ("Accessibility:", new Modifier[] {
-                new NoFail(),
-                new SlowMode()
+                NoFail.Instance,
+                SlowMode.Instance
             }),
             ("Challenge:", new Modifier[] {
-                new HyperSpeed(),
-                new UltraSpeed(),
-                new Hidden(),
-                new SurvivalMode()
+                HyperSpeed.Instance,
+                UltraSpeed.Instance,
+                Hidden.Instance,
+                SurvivalMode.Instance
             }),
             ("Other:", new Modifier[] {
-                new AutoPlay()
+                AutoPlay.Instance
             })
         };
 
@@ -66,21 +76,21 @@ public class Plugin : SpinPlugin {
         
         harmony.PatchAll(typeof(PlaySpeedManager));
         harmony.PatchAll(typeof(CompleteScreenUI));
-        modifiers = new List<Modifier>();
-        Modifiers = new ReadOnlyCollection<Modifier>(modifiers);
 
-        foreach (var (_, category) in modifierCategories) {
-            foreach (var modifier in category) {
-                modifiers.Add(modifier);
-                harmony.PatchAll(modifier.GetType());
-            }
+        for (int i = 0; i < modifiers.Length; i++) {
+            var modifier = modifiers[i];
+            int j = i;
+            
+            harmony.PatchAll(modifier.GetType());
+            modifier.Enabled.Bind(value => OnModifierToggled(modifier, j, value));
         }
 
+        Modifiers = new ReadOnlyCollection<Modifier>(modifiers);
+        
         if (scoreModLoaded)
             ScoreModWrapper.CreateScoreModifierSet(modifiers);
 
-        foreach (var modifier in modifiers)
-            modifier.Enabled.Bind(value => OnModifierToggled(modifier, value));
+        
     }
 
     protected override void CreateMenus() {
@@ -91,11 +101,11 @@ public class Plugin : SpinPlugin {
 
         var builder = new StringBuilder();
 
-        foreach ((string name, var modifiers) in modifierCategories) {
+        foreach ((string categoryName, var categoryModifiers) in modifierCategories) {
             new GameObject("Empty").AddComponent<LayoutElement>().transform.SetParent(root, false);
-            SpinUI.CreateText(name, root);
+            SpinUI.CreateText(categoryName, root);
 
-            foreach (var modifier in modifiers) {
+            foreach (var modifier in categoryModifiers) {
                 builder.Clear();
                 builder.Append(modifier.Name);
 
@@ -147,15 +157,17 @@ public class Plugin : SpinPlugin {
     }
 
     private static void DisableOthersInExclusivityGroup(int group, int indexToKeep) {
-        foreach (var modifier in modifiers) {
-            if (modifier.ExclusivityGroup == group && modifier.Index != indexToKeep)
+        for (int i = 0; i < modifiers.Length; i++) {
+            var modifier = modifiers[i];
+            
+            if (modifier.ExclusivityGroup == group && i != indexToKeep)
                 modifier.Enabled.Value = false;
         }
     }
 
-    private static void OnModifierToggled(Modifier modifier, bool value) {
+    private static void OnModifierToggled(Modifier modifier, int index, bool value) {
         if (value && modifier.ExclusivityGroup >= 0)
-            DisableOthersInExclusivityGroup(modifier.ExclusivityGroup, modifier.Index);
+            DisableOthersInExclusivityGroup(modifier.ExclusivityGroup, index);
 
         anyModifiersEnabled = false;
 
