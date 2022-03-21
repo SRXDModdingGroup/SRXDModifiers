@@ -3,7 +3,7 @@
 public abstract class SpeedModifier<T> : Modifier<T> where T : Modifier<T> {
     public override bool BlocksSubmission => false;
 
-    public override int ExclusivityGroup => 1;
+    public override ExclusivityGroup ExclusivityGroup => ExclusivityGroup.Speed;
     
     protected abstract float Amount { get; }
 

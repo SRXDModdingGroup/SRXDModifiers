@@ -9,7 +9,7 @@ public class AutoPlay : Modifier<AutoPlay> {
 
     public override bool BlocksSubmission => true;
 
-    public override int ExclusivityGroup => 0;
+    public override ExclusivityGroup ExclusivityGroup => ExclusivityGroup.NoFail;
 
     [HarmonyPatch(typeof(Wheel), nameof(Wheel.UpdateWheel)), HarmonyPostfix]
     private static void Wheel_UpdateWheel_Postfix(Wheel __instance)

@@ -7,7 +7,7 @@ public class NoFail : Modifier<NoFail> {
 
     public override bool BlocksSubmission => true;
 
-    public override int ExclusivityGroup => 0;
+    public override ExclusivityGroup ExclusivityGroup => ExclusivityGroup.NoFail;
 
     public override void LateInit() => Enabled.Bind(value => GameplayVariables.Instance.allowFailure = !value);
 }

@@ -18,7 +18,7 @@ public abstract class Modifier {
     /// <summary>
     /// Optional value which prevents multiple modifiers in the same exclusivity group from being enabled at the same time
     /// </summary>
-    public virtual int ExclusivityGroup => -1;
+    public virtual ExclusivityGroup ExclusivityGroup => ExclusivityGroup.None;
     /// <summary>
     /// True if the modifier is currently enabled
     /// </summary>

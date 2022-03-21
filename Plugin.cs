@@ -156,7 +156,7 @@ public class Plugin : SpinPlugin {
         submissionDisabledText.enabled = ScoreModWrapper.GetAnyBlocksSubmission();
     }
 
-    private static void DisableOthersInExclusivityGroup(int group, int indexToKeep) {
+    private static void DisableOthersInExclusivityGroup(ExclusivityGroup group, int indexToKeep) {
         for (int i = 0; i < modifiers.Length; i++) {
             var modifier = modifiers[i];
             
@@ -166,7 +166,7 @@ public class Plugin : SpinPlugin {
     }
 
     private static void OnModifierToggled(Modifier modifier, int index, bool value) {
-        if (value && modifier.ExclusivityGroup >= 0)
+        if (value && modifier.ExclusivityGroup > ExclusivityGroup.None)
             DisableOthersInExclusivityGroup(modifier.ExclusivityGroup, index);
 
         anyModifiersEnabled = false;

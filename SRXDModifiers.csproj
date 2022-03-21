@@ -75,6 +75,7 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="CompleteScreenUI.cs" />
+        <Compile Include="ExclusivityGroup.cs" />
         <Compile Include="Modifier.cs" />
         <Compile Include="Modifiers\AutoPlay.cs" />
         <Compile Include="Modifiers\Hidden.cs" />
