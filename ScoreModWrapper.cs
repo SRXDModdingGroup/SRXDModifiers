@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using SRXDScoreMod;
+﻿using SRXDScoreMod;
 
 namespace SRXDModifiers; 
 
