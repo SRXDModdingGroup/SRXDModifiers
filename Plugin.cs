@@ -89,8 +89,6 @@ public class Plugin : SpinPlugin {
         
         if (scoreModLoaded)
             ScoreModWrapper.CreateScoreModifierSet(modifiers);
-
-        
     }
 
     protected override void CreateMenus() {
@@ -137,6 +135,9 @@ public class Plugin : SpinPlugin {
     }
 
     private static void UpdateMultiplierText() {
+        if (multiplierText == null || submissionDisabledText == null)
+            return;
+        
         if (!scoreModLoaded) {
             multiplierText.SetText("ScoreMod not found. Install ScoreMod to enable score multipliers");
             submissionDisabledText.enabled = anyModifiersEnabled;
@@ -189,10 +190,9 @@ public class Plugin : SpinPlugin {
     }
 
     private static void MultiplierToString(StringBuilder builder, int multiplier) {
-        string multString = multiplier.ToString();
-
         if (multiplier % 100 > 0) {
-            multString = multString.PadLeft(3, '0');
+            string multString = multiplier.ToString().PadLeft(3, '0');
+
             builder.Append(multString.Insert(multString.Length - 2, ".").TrimEnd('0'));
         }
         else

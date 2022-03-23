@@ -136,7 +136,7 @@ public class Hidden : Modifier<Hidden> {
     [HarmonyPatch(typeof(TrackRenderer), "DrawNoteMeshes"), HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> TrackRenderer_DrawNoteMeshes_Transpiler(IEnumerable<CodeInstruction> instructions) {
         var instructionsList = new List<CodeInstruction>(instructions);
-        var operations = new DeferredListOperation<CodeInstruction>();
+        var operations = new EnumerableOperation<CodeInstruction>();
         var Note_time = typeof(Note).GetField(nameof(Note.time));
         var PlayableTrackData_GetLastNoteIndexBeforeTime = typeof(PlayableTrackData).GetMethod(nameof(PlayableTrackData.GetLastNoteIndexBeforeTime));
         var Hidden_GetModifiedPropertyBlock = typeof(Hidden).GetMethod(nameof(GetModifiedPropertyBlock), BindingFlags.NonPublic | BindingFlags.Static);
@@ -164,9 +164,7 @@ public class Hidden : Modifier<Hidden> {
             new (OpCodes.Sub),
             new (OpCodes.Call, Hidden_GetModifiedPropertyBlock)
         });
-        
-        operations.Execute(instructionsList);
 
-        return instructionsList;
+        return operations.Enumerate(instructionsList);
     }
 }
