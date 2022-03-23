@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection.Emit;
 using HarmonyLib;
 using SMU.Extensions;
@@ -25,40 +24,51 @@ public static class PlaySpeedManager {
         UpdateMultiplier();
     }
 
+    private static bool ignoreMultiplier;
+
     private static void UpdateMultiplier() {
-        SpeedMultiplier = 1f;
-        
+        float newMultiplier = 1f;
         var track = Track.Instance;
 
-        if (track != null && !track.IsInEditMode && !track.playStateFirst.isInPracticeMode) {
+        if (track != null && !ignoreMultiplier) {
             foreach (var pair in playSpeedModifiers)
-                SpeedMultiplier *= pair.Value;
+                newMultiplier *= pair.Value;
             
-            track.ChangePitch(SpeedMultiplier);
+            if (track.basePitch != newMultiplier)
+                track.ChangePitch(newMultiplier);
         }
 
-        OnSpeedMultiplierChanged?.Invoke(SpeedMultiplier);
+        if (newMultiplier == SpeedMultiplier)
+            return;
+
+        SpeedMultiplier = newMultiplier;
+        OnSpeedMultiplierChanged?.Invoke(newMultiplier);
     }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(Track), nameof(Track.PlayTrack))]
-    [HarmonyPatch(typeof(Track), nameof(Track.RestartTrack))]
-    [HarmonyPatch(typeof(Track), nameof(Track.PracticeTrack))]
-    private static void Track_PlayTrack_RestartTrack_PracticeTrack_Postfix(Track __instance) {
-        UpdateMultiplier();
-
-        if (__instance.IsInEditMode || __instance.playStateFirst.isInPracticeMode)
+    private static void Track_PlayTrack_Postfix(Track __instance) {
+        if (__instance.IsInEditMode || __instance.playStateFirst.isInPracticeMode) {
+            ignoreMultiplier = true;
             __instance.ChangePitch(1f);
+        }
+        else
+            ignoreMultiplier = false;
+        
+        UpdateMultiplier();
     }
 
     [HarmonyPatch(typeof(XDLevelSelectMenuBase), nameof(XDLevelSelectMenuBase.OpenMenu)), HarmonyPostfix]
-    private static void XDLevelSelectMenuBase_OpenMenu_Postfix() => UpdateMultiplier();
+    private static void XDLevelSelectMenuBase_OpenMenu_Postfix() {
+        ignoreMultiplier = false;
+        UpdateMultiplier();
+    }
 
     [HarmonyPatch(typeof(GameplayVariables), nameof(GameplayVariables.GetTrackSpeedForDifficulty)), HarmonyPostfix]
     private static void GameplayVariables_GetTrackSpeedForDifficulty_Postfix(ref float __result) {
         var track = Track.Instance;
         
-        if (track == null || track.IsInEditMode || track.playStateFirst.isInPracticeMode)
+        if (track == null || ignoreMultiplier)
             return;
 
         UpdateMultiplier();
