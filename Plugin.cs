@@ -10,10 +10,8 @@ using SpinCore;
 using SpinCore.UI;
 using SpinCore.Utility;
 using SRXDModifiers.Modifiers;
-using SRXDScoreMod;
 using UnityEngine;
 using UnityEngine.UI;
-using ScoreModifier = SRXDScoreMod.ScoreModifier;
 
 namespace SRXDModifiers;
 
